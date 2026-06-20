@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Susie - 光子易客户经理</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: #0a0a0a;
+            color: #e0e0e0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+        }
+        .avatar {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0 auto 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            color: white;
+            font-weight: bold;
+            box-shadow: 0 0 30px rgba(102, 126, 234, 0.3);
+        }
+        h1 {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #ffffff;
+        }
+        .subtitle {
+            font-size: 14px;
+            color: #888;
+            margin-bottom: 32px;
+        }
+        .bio {
+            background: #141414;
+            border: 1px solid #222;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 32px;
+            line-height: 1.8;
+            font-size: 15px;
+            color: #ccc;
+            text-align: left;
+        }
+        .section-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #667eea;
+            margin-bottom: 16px;
+            font-weight: 600;
+        }
+        .services {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+            margin-bottom: 32px;
+        }
+        .tag {
+            background: #1a1a2e;
+            border: 1px solid #2a2a4a;
+            color: #a0a0ff;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+        }
+        .wechat-section {
+            background: #141414;
+            border: 1px solid #222;
+            border-radius: 12px;
+            padding: 32px;
+            margin-bottom: 32px;
+        }
+        .wechat-qr {
+            width: 160px;
+            height: 160px;
+            background: #fff;
+            border-radius: 8px;
+            margin: 0 auto 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+            font-size: 13px;
+            position: relative;
+            overflow: hidden;
+        }
+        .wechat-qr::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: repeating-conic-gradient(#ddd 0% 25%, #fff 0% 50%) 50% / 8px 8px;
+            opacity: 0.3;
+        }
+        .wechat-qr span {
+            position: relative;
+            z-index: 1;
+            background: rgba(255,255,255,0.9);
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+        .wechat-hint {
+            font-size: 13px;
+            color: #888;
+        }
+        .contact-form {
+            background: #141414;
+            border: 1px solid #222;
+            border-radius: 12px;
+            padding: 24px;
+            text-align: left;
+        }
+        .contact-form label {
+            display: block;
+            font-size: 13px;
+            color: #888;
+            margin-bottom: 6px;
+            margin-top: 16px;
+        }
+        .contact-form label:first-child { margin-top: 0; }
+        .contact-form input,
+        .contact-form textarea {
+            width: 100%;
+            padding: 10px 14px;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .contact-form input:focus,
+        .contact-form textarea:focus {
+            border-color: #667eea;
+        }
+        .contact-form textarea { resize: vertical; min-height: 80px; }
+        .contact-form button {
+            width: 100%;
+            margin-top: 16px;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        .contact-form button:hover { opacity: 0.9; }
+        .footer {
+            margin-top: 40px;
+            font-size: 12px;
+            color: #444;
+        }
+        @media (max-width: 480px) {
+            h1 { font-size: 22px; }
+            .avatar { width: 100px; height: 100px; font-size: 40px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="avatar">S</div>
+        <h1>Susie</h1>
+        <p class="subtitle">光子易客户经理</p>
+
+        <div class="bio">
+            您好，我是光子易客户经理苏西。专做美金、小币种、新兴币种回款，基本覆盖全行业及部分敏感地区可收款，支持转口贸易。希望有机会与您沟通合作！
+        </div>
+
+        <div class="section-title">服务范围</div>
+        <div class="services">
+            <span class="tag">美金回款</span>
+            <span class="tag">小币种</span>
+            <span class="tag">新兴币种</span>
+            <span class="tag">全行业覆盖</span>
+            <span class="tag">敏感地区收款</span>
+            <span class="tag">转口贸易</span>
+        </div>
+
+        <div class="wechat-section">
+            <div class="section-title">微信联系</div>
+            <div class="wechat-qr">
+                <span>请替换为微信二维码</span>
+            </div>
+            <p class="wechat-hint">扫描二维码或搜索微信号添加好友</p>
+        </div>
+
+        <div class="contact-form">
+            <div class="section-title">给我留言</div>
+            <form onsubmit="handleSubmit(event)">
+                <label>您的称呼</label>
+                <input type="text" name="name" placeholder="请输入您的称呼" required>
+                <label>联系方式</label>
+                <input type="text" name="contact" placeholder="手机号 / 微信号 / 邮箱" required>
+                <label>留言内容</label>
+                <textarea name="message" placeholder="请输入您想咨询的内容..." required></textarea>
+                <button type="submit">发送消息</button>
+            </form>
+        </div>
+
+        <p class="footer">© 2026 Susie · Powered by PhotonPay</p>
+    </div>
+
+    <script>
+        function handleSubmit(e) {
+            e.preventDefault();
+            const form = e.target;
+            const data = new FormData(form);
+            const name = data.get('name');
+            const contact = data.get('contact');
+            const message = data.get('message');
+
+            // Using mailto to send email (free, no backend needed)
+            const subject = encodeURIComponent(`来自 ${name} 的咨询`);
+            const body = encodeURIComponent(`称呼: ${name}\n联系方式: ${contact}\n留言: ${message}`);
+            window.location.href = `mailto:thialin333@gmail.com?subject=${subject}&body=${body}`;
+
+            alert('感谢您的留言！正在为您打开邮件客户端...');
+            form.reset();
+        }
+    </script>
+</body>
+</html>
