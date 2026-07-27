@@ -1,0 +1,46 @@
+- [ ] `npm install` 与 `npm run dev` 无报错，开发服务器在 `http://localhost:5173` 启动
+- [ ] `npm run build` 产出 `dist/` 静态资源，无 TypeScript 编译错误
+- [ ] 页面背景为 `#010208`，无滚动条，`overscroll-behavior:none` 生效
+- [ ] 加载遮罩显示：520×520 径向辉光、80×80 旋转环（1.6s）、中心 10px 圆点带 `0 0 18px 4px rgba(103,232,249,0.7)` 辉光
+- [ ] 加载遮罩标题 `ORBITLIVE` 字距 `0.35em`，副标题 `全球卫星实时追踪` 字距 `0.3em`
+- [ ] 加载遮罩进度条宽度随 progress 0→100% 增长，颜色 `from-cyan-400 to-sky-500`
+- [ ] 加载遮罩页脚显示 `轨道数据：CelesTrak NORAD GP（TLE） · 推算：satellite.js SGP4（浏览器本地实时计算）`
+- [ ] 加载完成后遮罩在 700ms 内淡出
+- [ ] 3D 场景背景为 `#010208`，地球可见
+- [ ] 地球表面纹理（`earth_atmos_2048.jpg`）+ 法线（`earth_normal_2048.jpg`）+ 高光（`earth_specular_2048.jpg`）正确加载
+- [ ] 地球夜侧可见黄色城市灯光（`earth_lights_2048.png`），昼夜分界线随时间移动
+- [ ] 地球外缘有青蓝大气辉光（fresnel shader，BackSide）
+- [ ] 云层（`earth_clouds_1024.png`）opacity 0.42，每帧缓慢自转
+- [ ] 星空背景：3200 颗暗星 + 160 颗亮星，无闪烁
+- [ ] 至少 8000 颗卫星以彩色 Points 渲染，每分组颜色与 spec 表一致（星链 `#7dd3fc`、空间站 `#ffffff` 等）
+- [ ] 卫星 Points 使用自定义 GLSL 着色器，AdditiveBlending，size 范围 1.2–14px
+- [ ] 卫星位置每帧轮询更新 1/6（约 10 Hz/颗）
+- [ ] 头部 `ORBITLIVE` 字距 `0.28em`，状态药丸显示 `● CelesTrak 实时 TLE 已同步`（绿色）或 `● 内置 TLE 快照`（橙色）
+- [ ] 头部计数行格式 `${visible} / ${total} 颗在轨目标 · TLE 更新于 ${ageStr}` 正确
+- [ ] 搜索框 placeholder `搜索卫星：ISS / STARLINK-…`，输入时显示 ✕ 清空按钮
+- [ ] 搜索结果下拉最多 9 条，startsWith 优先 includes，每行有 8×8 颜色点 + 名称 + `#${norad} · ${groupLabel}` 副文本
+- [ ] 星座分组面板右侧垂直居中，可折叠，10 行带颜色点+辉光+计数
+- [ ] 点击分组行可切换显隐，对应卫星 Points 立即消失/出现
+- [ ] 详情面板左下角显示（仅选中时），含 6 行信息：高度/速度/纬经度/周期/倾角/TLE龄期
+- [ ] 详情面板分组徽章颜色与卫星所属分组一致
+- [ ] 详情面板页脚显示 `轨道线与地面覆盖圈基于 SGP4 对整周期 220 点采样推算`
+- [ ] 时间控制条底部居中，含 ⏮ 现在 / 播放暂停 / 5 个倍速按钮 / UTC 时钟
+- [ ] 倍速档位 `[1, 10, 60, 300, 1000]`，激活态 `bg-cyan-400/20 text-cyan-200`
+- [ ] 时钟显示格式 `YYYY-MM-DD HH:MM:SS UTC`，使用 `font-num` tabular-nums
+- [ ] 右下来源标注 `数据：CelesTrak NORAD GP · SGP4 本地推算 · 无 API key`（仅 md+ 屏可见）
+- [ ] 点击 3D 卫星后：轨道线（color `#8BE9FF`）、覆盖圈（`#67E8F9` 线 + `#22D3EE` 半透明扇）、选中环（脉冲）出现
+- [ ] 选中卫星后相机不自动飞向该卫星
+- [ ] ISS 永久显示 HTML 标签 `国际空间站 ISS`，位于卫星 3D 位置上方
+- [ ] 选中卫星显示 `.sat-label--sel` 样式标签（青色文字 + 青色边框 + 辉光）
+- [ ] 卫星在地球背面时其 HTML 标签自动隐藏（`dot(satPos, cameraPos) < 0.12`）
+- [ ] `Escape` 键取消选中，详情面板/轨道线/覆盖圈/选中环隐藏
+- [ ] URL `?sel=25544` 加载后自动选中 ISS
+- [ ] 相机初始位置对准日侧（基于启动时太阳方向）
+- [ ] OrbitControls：dampingFactor 0.08、rotateSpeed 0.55、minDistance 1.14、maxDistance 40、enablePan false
+- [ ] 用户交互后 autoRotate 关闭，12 秒空闲后自动恢复（autoRotateSpeed -0.28）
+- [ ] `.glass` 类样式正确（背景 `#080f1e8c`、blur 14px、边框 `rgba(125,211,252,.14)`、阴影 `0 4px 24px #00000059`）
+- [ ] `.font-num` 类启用 tabular-nums + monospace 字体栈
+- [ ] 滚动条样式 6px 宽、`#7dd3fc33` 颜色、3px 圆角
+- [ ] CelesTrak 在线同步失败时降级为快照模式，状态徽章显示橙色
+- [ ] 解析后卫星数 < 100 时抛出 `"TLE 快照解析失败"` 错误
+- [ ] 工程目录结构与 spec 完全一致（src/engine/、src/components/、public/data/、public/textures/）
