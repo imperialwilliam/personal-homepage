@@ -9,6 +9,7 @@ import Engine, {
 import Hud, { type DataStatus } from '../components/Hud'
 import LoadingOverlay from '../components/LoadingOverlay'
 import { predictBestPass, type Observer, type PassInfo } from '../engine/passes'
+import type { CityDef } from '../engine/cities'
 
 const ISS_LABEL_TEXT = '国际空间站 ISS'
 
@@ -43,6 +44,7 @@ export default function Home() {
 
   const [observer, setObserver] = useState<Observer | null>(null)
   const [locating, setLocating] = useState(false)
+  const [city, setCity] = useState<CityDef | null>(null)
   const [passInfo, setPassInfo] = useState<PassInfo | null>(null)
 
   // Mount engine
@@ -181,12 +183,18 @@ export default function Home() {
           lonDeg: pos.coords.longitude,
           altKm: (pos.coords.altitude ?? 0) / 1000,
         })
+        setCity(null) // custom location — clear the city preset marker
         setLocating(false)
       },
       () => setLocating(false),
       { enableHighAccuracy: false, timeout: 10_000, maximumAge: 300_000 },
     )
   }, [locating])
+
+  const onSelectCity = useCallback((c: CityDef) => {
+    setCity(c)
+    setObserver({ latDeg: c.lat, lonDeg: c.lon, altKm: 0.05 })
+  }, [])
 
   const onToggleGroup = (key: string) => {
     engineRef.current?.setGroupVisible(key, !groupVisibility[key])
@@ -260,6 +268,8 @@ export default function Home() {
         observer={observer}
         locating={locating}
         onLocateMe={onLocateMe}
+        city={city}
+        onSelectCity={onSelectCity}
         passInfo={passInfo}
         satLabels={satLabels}
         issLabelText={ISS_LABEL_TEXT}

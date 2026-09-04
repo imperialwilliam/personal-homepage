@@ -11,7 +11,14 @@
   --accent: #f0a83c;
   --accent-soft: rgba(240, 168, 60, 0.14);
   --hairline: rgba(232, 234, 242, 0.1);
-  --panel: rgba(8, 11, 18, 0.78);
+  --panel: rgba(10, 13, 21, 0.8);
+
+  /* Apple-style corner radii */
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 18px;
+  --r-xl: 24px;
+  --r-pill: 9999px;
 }
 
 html,
@@ -38,36 +45,21 @@ body {
 /* ---------- Panels ---------- */
 .panel {
   background: var(--panel);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
   border: 1px solid var(--hairline);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  border-radius: var(--r-lg);
 }
 
-/* Target-lock corner brackets (cinematic reticle) */
+/* Target-lock glow (cinematic, suits large corner radii) */
 .reticle {
   position: relative;
-}
-.reticle::before,
-.reticle::after {
-  content: '';
-  position: absolute;
-  width: 14px;
-  height: 14px;
-  border-color: var(--accent);
-  border-style: solid;
-  opacity: 0.85;
-  pointer-events: none;
-}
-.reticle::before {
-  top: -1px;
-  left: -1px;
-  border-width: 1px 0 0 1px;
-}
-.reticle::after {
-  bottom: -1px;
-  right: -1px;
-  border-width: 0 1px 1px 0;
+  border: 1px solid rgba(240, 168, 60, 0.28);
+  box-shadow:
+    0 0 0 1px rgba(240, 168, 60, 0.15),
+    0 0 36px rgba(240, 168, 60, 0.1),
+    inset 0 0 0 1px rgba(240, 168, 60, 0.08);
 }
 
 /* ---------- Live pulse ---------- */
@@ -101,22 +93,15 @@ body {
   }
 }
 
-/* ---------- Film grain + vignette (cinematic finish) ---------- */
+/* ---------- Static film grain (NO animation — animated grain reads as
+   screen flicker on a dark background and makes the view dizzy) ---------- */
 .grain {
   position: fixed;
   inset: -50%;
-  z-index: 90;
+  z-index: 89;
   pointer-events: none;
-  opacity: 0.05;
+  opacity: 0.028;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  animation: grain-shift 0.9s steps(4) infinite;
-}
-@keyframes grain-shift {
-  0% { transform: translate(0, 0); }
-  25% { transform: translate(-2%, 1%); }
-  50% { transform: translate(1%, -2%); }
-  75% { transform: translate(-1%, 2%); }
-  100% { transform: translate(2%, -1%); }
 }
 
 .vignette {
@@ -168,13 +153,13 @@ body {
   left: -100px;
   top: -100px;
   transform: translate(-50%, -150%);
-  padding: 2px 8px;
+  padding: 3px 10px;
   font-size: 10px;
   letter-spacing: 0.08em;
   color: #eef0f6;
-  background: rgba(8, 11, 18, 0.68);
+  background: rgba(10, 13, 21, 0.78);
   border: 1px solid var(--hairline);
-  border-radius: 2px;
+  border-radius: var(--r-pill);
   white-space: nowrap;
   pointer-events: none;
   -webkit-backdrop-filter: blur(6px);
@@ -206,9 +191,8 @@ input::placeholder {
   color: var(--ink-faint);
 }
 
-/* Reduced motion: kill grain/entrance theatrics */
+/* Reduced motion: kill pulse-ring/entrance theatrics */
 @media (prefers-reduced-motion: reduce) {
-  .grain,
   .pulse-dot::after {
     animation: none;
   }

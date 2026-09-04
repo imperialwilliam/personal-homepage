@@ -149,6 +149,11 @@ export class Engine {
   private nightMat!: THREE.ShaderMaterial
   private clouds!: THREE.Mesh
   private satPoints: THREE.Points[] = []
+  /** Per-group target positions (one Float32Array per group, same layout as the
+   *  position attribute). Propagation writes here; the render loop eases each
+   *  point toward its target so the 1/6-per-frame fan-out is invisible —
+   *  no positional jumps, no twinkle. */
+  private targetPos: Float32Array[] = []
   private orbitLine!: THREE.Line
   private covLoop!: THREE.Line
   private covFan!: THREE.Mesh
@@ -455,6 +460,9 @@ export class Engine {
         positions[i * 3 + 1] = -1e5
         positions[i * 3 + 2] = 0
       }
+      // Mirror target buffer — starts hidden like the geometry.
+      const target = new Float32Array(positions)
+      this.targetPos.push(target)
       const geo = new THREE.BufferGeometry()
       const attr = new THREE.BufferAttribute(positions, 3)
       attr.setUsage(THREE.DynamicDrawUsage)
@@ -464,7 +472,7 @@ export class Engine {
           uColor: { value: new THREE.Color(def.color).multiplyScalar(1.25) },
           uSize: { value: def.size },
           uPixelRatio: { value: pixelRatio },
-          uOpacity: { value: 0.95 },
+          uOpacity: { value: 0.72 },
         },
         vertexShader: satPointVertex,
         fragmentShader: satPointFragment,
@@ -490,6 +498,7 @@ export class Engine {
       mat.dispose()
     }
     this.satPoints = []
+    this.targetPos = []
     this.buildSatPoints()
   }
 
@@ -592,34 +601,68 @@ export class Engine {
       this.controls.autoRotate = true
     }
 
-    // Propagate 1/6 of satellites (round-robin via cursor)
+    // Propagate 1/6 of satellites into per-group target buffers (round-robin)
     const total = Math.max(1, this.sats.length)
     const stride = Math.max(1, Math.floor(this.sats.length / 6))
-    for (const points of this.satPoints) {
+    for (let gi = 0; gi < this.satPoints.length; gi++) {
+      const points = this.satPoints[gi]
       const group = points.userData.group as GroupBucket
       const sats = group.sats
       if (sats.length === 0) continue
-      const posAttr = points.geometry.attributes.position as THREE.BufferAttribute
-      const arr = posAttr.array as Float32Array
+      const targetArr = this.targetPos[gi]
       const groupStride = Math.min(stride, sats.length)
       for (let j = 0; j < groupStride; j++) {
         const idx = (this.cursor + j) % sats.length
         const sat = sats[idx]
         const eci = propagateSat(sat.satrec, date)
         if (!eci) {
-          arr[idx * 3] = 0
-          arr[idx * 3 + 1] = -1e5
-          arr[idx * 3 + 2] = 0
+          targetArr[idx * 3] = 0
+          targetArr[idx * 3 + 1] = -1e5
+          targetArr[idx * 3 + 2] = 0
           continue
         }
         const [tx, ty, tz] = eciToThree(eci, gmst)
-        arr[idx * 3] = tx
-        arr[idx * 3 + 1] = ty
-        arr[idx * 3 + 2] = tz
+        targetArr[idx * 3] = tx
+        targetArr[idx * 3 + 1] = ty
+        targetArr[idx * 3 + 2] = tz
       }
-      posAttr.needsUpdate = true
     }
     this.cursor = (this.cursor + stride) % total
+
+    // Ease every point toward its propagated target. The fan-out above writes
+    // only 1/6 of the fleet per frame; easing makes updates continuous so the
+    // ~100ms propagation cycle never shows as visible positional jumps,
+    // twinkling or screen flicker.
+    const EASE = 0.26
+    for (let gi = 0; gi < this.satPoints.length; gi++) {
+      const points = this.satPoints[gi]
+      const posAttr = points.geometry.attributes.position as THREE.BufferAttribute
+      const arr = posAttr.array as Float32Array
+      const targetArr = this.targetPos[gi]
+      const sats = (points.userData.group as GroupBucket).sats
+      let dirty = false
+      for (let k = 0; k < sats.length; k++) {
+        const k3 = k * 3
+        const t0 = arr[k3], t1 = arr[k3 + 1], t2 = arr[k3 + 2]
+        const n0 = targetArr[k3], n1 = targetArr[k3 + 1], n2 = targetArr[k3 + 2]
+        if (n1 < -9e4) {
+          // Hidden — only touch the attribute if it isn't already
+          if (t1 !== -1e5) {
+            arr[k3] = 0
+            arr[k3 + 1] = -1e5
+            arr[k3 + 2] = 0
+            dirty = true
+          }
+          continue
+        }
+        if (Math.abs(n1 - t1) < 1e-3 && Math.abs(n0 - t0) < 1e-3 && Math.abs(n2 - t2) < 1e-3) continue
+        arr[k3] = t0 + (n0 - t0) * EASE
+        arr[k3 + 1] = t1 + (n1 - t1) * EASE
+        arr[k3 + 2] = t2 + (n2 - t2) * EASE
+        dirty = true
+      }
+      if (dirty) posAttr.needsUpdate = true
+    }
 
     // Selected satellite visuals
     let selThreePos: THREE.Vector3 | null = null

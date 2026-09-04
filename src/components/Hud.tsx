@@ -1,6 +1,7 @@
 import { memo, useEffect, useRef, useState } from 'react'
 import { GROUPS } from '../engine/groups'
 import { FEATURED } from '../engine/featured'
+import { CITIES, type CityDef } from '../engine/cities'
 import type { Observer, PassInfo } from '../engine/passes'
 import { compassLabel } from '../engine/passes'
 
@@ -89,6 +90,8 @@ export interface HudProps {
   observer: Observer | null
   locating: boolean
   onLocateMe: () => void
+  city: CityDef | null
+  onSelectCity: (c: CityDef) => void
   passInfo: PassInfo | null
   satLabels: {
     iss: { x: number; y: number; visible: boolean } | null
@@ -145,8 +148,8 @@ function Header({
   const { tag, dot } = liveLabel(dataStatus)
   const utc = `${simTime.toISOString().slice(11, 19)} UTC`
   return (
-    <header className="pointer-events-none absolute inset-x-0 top-0 z-20 border-b border-[var(--hairline)] bg-[rgba(4,6,11,0.42)] backdrop-blur-md">
-      <div className="flex items-end justify-between px-4 pb-2.5 pt-3 md:px-6">
+    <header className="pointer-events-none absolute inset-x-0 top-0 z-20 border-b border-[var(--hairline)] bg-[rgba(4,6,11,0.4)] backdrop-blur-xl">
+      <div className="flex items-end justify-between px-4 pb-2.5 pt-3 md:px-6 md:pb-3 md:pt-4">
         {/* Wordmark */}
         <div className="rise rise-1">
           <h1 className="font-display text-[15px] font-semibold tracking-[0.42em] text-[var(--ink)] md:text-[17px]">
@@ -158,7 +161,7 @@ function Header({
         </div>
 
         {/* Live telemetry */}
-        <div className="flex items-center gap-4 md:gap-6">
+        <div className="flex items-center gap-3 md:gap-5">
           <div className="hidden text-right sm:block">
             <div className="flex items-center justify-end gap-2">
               <span className={cn('pulse-dot', dot)} />
@@ -185,7 +188,7 @@ function Header({
             onClick={onRefresh}
             disabled={refreshing}
             title="从 CelesTrak 刷新实时轨道根数"
-            className="pointer-events-auto flex size-8 items-center justify-center rounded-sm border border-[var(--hairline)] text-[var(--ink-dim)] transition-colors hover:border-[var(--accent)]/50 hover:text-[var(--accent)] disabled:opacity-50"
+            className="pointer-events-auto flex size-8 items-center justify-center rounded-full border border-[var(--hairline)] text-[var(--ink-dim)] transition-colors hover:border-[var(--accent)]/50 hover:text-[var(--accent)] disabled:opacity-50"
           >
             <svg
               viewBox="0 0 24 24"
@@ -217,7 +220,7 @@ function SearchBox({ searchResults, searchQuery, onSearchChange, onSelectSearch 
   const open = focused && searchQuery.trim().length > 0 && searchResults.length > 0
 
   useEffect(() => {
-    if (!open) return
+    if (!open && !focused) return
     const handler = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setFocused(false)
@@ -225,7 +228,7 @@ function SearchBox({ searchResults, searchQuery, onSearchChange, onSelectSearch 
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [open])
+  }, [open, focused])
 
   const select = (norad: string) => {
     onSelectSearch(norad)
@@ -234,7 +237,7 @@ function SearchBox({ searchResults, searchQuery, onSearchChange, onSelectSearch 
 
   return (
     <div ref={containerRef} className="absolute right-4 top-[64px] z-30 w-[280px] md:right-6 md:top-[76px] md:w-[320px]">
-      <div className="panel rise rise-2 flex items-center gap-2.5 rounded-sm px-3 py-2.5">
+      <div className="panel rise rise-2 flex items-center gap-2.5 rounded-2xl px-3.5 py-2.5">
         <svg
           viewBox="0 0 24 24"
           fill="none"
@@ -268,7 +271,7 @@ function SearchBox({ searchResults, searchQuery, onSearchChange, onSelectSearch 
 
       {/* Featured quick-select chips */}
       {focused && !searchQuery && (
-        <div className="panel rise mt-1.5 rounded-sm p-2">
+        <div className="panel rise mt-2 rounded-2xl p-2.5">
           <MicroLabel className="px-1.5 pb-1.5 pt-0.5">快速锁定 · Quick lock</MicroLabel>
           <div className="space-y-0.5">
             {FEATURED.map((f) => (
@@ -276,7 +279,7 @@ function SearchBox({ searchResults, searchQuery, onSearchChange, onSelectSearch 
                 key={f.norad}
                 type="button"
                 onClick={() => select(f.norad)}
-                className="flex w-full items-center justify-between rounded-sm px-1.5 py-1.5 text-left transition-colors hover:bg-[var(--accent-soft)]"
+                className="flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-[var(--accent-soft)]"
               >
                 <span className="text-[12px] font-medium text-[var(--ink)]">{f.badge}</span>
                 <span className="mono text-[10px] text-[var(--ink-faint)]">#{f.norad}</span>
@@ -288,7 +291,7 @@ function SearchBox({ searchResults, searchQuery, onSearchChange, onSelectSearch 
 
       {/* Results */}
       {open && (
-        <div className="panel mt-1.5 max-h-[300px] overflow-auto rounded-sm py-1">
+        <div className="panel mt-2 max-h-[320px] overflow-auto rounded-2xl py-1.5">
           {searchResults.map((r) => {
             const def = getGroupDef(r.groupKey)
             return (
@@ -296,7 +299,7 @@ function SearchBox({ searchResults, searchQuery, onSearchChange, onSelectSearch 
                 key={r.norad}
                 type="button"
                 onClick={() => select(r.norad)}
-                className="scan-in flex w-full items-center gap-2.5 px-2.5 py-2 text-left transition-colors hover:bg-[var(--accent-soft)]"
+                className="scan-in flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left transition-colors hover:bg-[var(--accent-soft)]"
               >
                 <span
                   className="size-1.5 shrink-0 rounded-full"
@@ -313,7 +316,7 @@ function SearchBox({ searchResults, searchQuery, onSearchChange, onSelectSearch 
                       {r.name}
                     </span>
                     {r.featuredBadge && (
-                      <span className="shrink-0 rounded-sm border border-[var(--accent)]/40 bg-[var(--accent-soft)] px-1.5 py-px text-[9px] font-semibold tracking-wide text-[var(--accent)]">
+                      <span className="shrink-0 rounded-full border border-[var(--accent)]/40 bg-[var(--accent-soft)] px-2 py-px text-[9px] font-semibold tracking-wide text-[var(--accent)]">
                         {r.featuredBadge}
                       </span>
                     )}
@@ -342,8 +345,8 @@ function GroupPanel({ groupCounts, groupVisibility, onToggleGroup }: GroupPanelP
   const [collapsed, setCollapsed] = useState(false)
   return (
     <div className="absolute right-4 top-1/2 z-20 hidden w-[176px] -translate-y-1/2 md:block lg:w-[196px]">
-      <div className="panel rise rise-3 rounded-sm p-3">
-        <div className="mb-2 flex items-center justify-between">
+      <div className="panel rise rise-3 rounded-2xl p-3">
+        <div className="mb-2 flex items-center justify-between px-1">
           <MicroLabel>Constellations · 星座</MicroLabel>
           <button
             type="button"
@@ -364,7 +367,7 @@ function GroupPanel({ groupCounts, groupVisibility, onToggleGroup }: GroupPanelP
                   type="button"
                   onClick={() => onToggleGroup(g.key)}
                   className={cn(
-                    'flex w-full items-center gap-2 rounded-sm px-1.5 py-1 text-left transition-colors hover:bg-white/5',
+                    'flex w-full items-center gap-2 rounded-full px-2 py-1 text-left transition-colors hover:bg-white/5',
                     !visible && 'opacity-40',
                   )}
                 >
@@ -389,6 +392,167 @@ function GroupPanel({ groupCounts, groupVisibility, onToggleGroup }: GroupPanelP
   )
 }
 
+// ---------- Location + pass prediction ----------
+
+interface LocationSectionProps {
+  observer: Observer | null
+  locating: boolean
+  onLocateMe: () => void
+  city: CityDef | null
+  onSelectCity: (c: CityDef) => void
+  passInfo: PassInfo | null
+}
+
+function LocationSection({
+  observer,
+  locating,
+  onLocateMe,
+  city,
+  onSelectCity,
+  passInfo,
+}: LocationSectionProps) {
+  const pickerRef = useRef<HTMLDivElement>(null)
+  const [open, setOpen] = useState(false)
+  const citySet = city !== null
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  const locLabel = citySet
+    ? `${city!.name} · ${observer ? `${Math.abs(observer.latDeg).toFixed(1)}°${observer.latDeg >= 0 ? 'N' : 'S'} ${Math.abs(observer.lonDeg).toFixed(1)}°${observer.lonDeg >= 0 ? 'E' : 'W'}` : ''}`
+    : observer
+      ? `自定义位置 · ${Math.abs(observer.latDeg).toFixed(2)}°${observer.latDeg >= 0 ? 'N' : 'S'} ${Math.abs(observer.lonDeg).toFixed(2)}°${observer.lonDeg >= 0 ? 'E' : 'W'}`
+      : '未设定位置'
+
+  const quick = CITIES.slice(0, 5)
+
+  return (
+    <div>
+      <div className="flex items-center justify-between">
+        <MicroLabel>Observer · 观测位置</MicroLabel>
+        <span className="mono max-w-[140px] truncate text-[9px] text-[var(--ink-faint)]">{locLabel}</span>
+      </div>
+
+      {/* City quick chips */}
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {quick.map((c) => (
+          <button
+            key={c.name}
+            type="button"
+            onClick={() => onSelectCity(c)}
+            className={cn(
+              'rounded-full border px-2.5 py-1 text-[10px] transition-colors',
+              city?.name === c.name
+                ? 'border-[var(--accent)]/60 bg-[var(--accent-soft)] text-[var(--accent)]'
+                : 'border-[var(--hairline)] text-[var(--ink-dim)] hover:border-[var(--accent)]/40 hover:text-[var(--ink)]',
+            )}
+          >
+            {c.name}
+          </button>
+        ))}
+        <div ref={pickerRef} className="relative">
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            className="rounded-full border border-[var(--hairline)] px-2.5 py-1 text-[10px] text-[var(--ink-dim)] transition-colors hover:border-[var(--accent)]/40 hover:text-[var(--ink)]"
+          >
+            {open ? '收起' : '更多'}
+          </button>
+          {open && (
+            <div className="panel rise absolute bottom-9 right-0 z-30 w-[260px] rounded-2xl p-2">
+              <div className="grid grid-cols-3 gap-1">
+                {CITIES.map((c) => (
+                  <button
+                    key={c.name}
+                    type="button"
+                    onClick={() => {
+                      onSelectCity(c)
+                      setOpen(false)
+                    }}
+                    className={cn(
+                      'rounded-full px-2 py-1.5 text-[10px] transition-colors',
+                      city?.name === c.name
+                        ? 'bg-[var(--accent-soft)] text-[var(--accent)]'
+                        : 'text-[var(--ink-dim)] hover:bg-white/5 hover:text-[var(--ink)]',
+                    )}
+                  >
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Locate button */}
+      <button
+        type="button"
+        onClick={onLocateMe}
+        disabled={locating}
+        className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--hairline)] py-2 text-[11px] text-[var(--ink-dim)] transition-colors hover:border-[var(--accent)]/50 hover:text-[var(--accent)] disabled:opacity-60"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="size-3.5">
+          <circle cx="12" cy="12" r="3" />
+          <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+        </svg>
+        {locating ? '定位中…' : '使用我的位置'}
+      </button>
+
+      {/* Pass prediction */}
+      <div className="mt-3 border-t border-[var(--hairline)] pt-3">
+        <MicroLabel>Overhead pass · 过顶预测</MicroLabel>
+        {!observer ? (
+          <div className="mt-1.5 text-[11px] leading-5 text-[var(--ink-faint)]">
+            选个城市或用我的位置，即预测所选卫星何时经过头顶。
+          </div>
+        ) : !passInfo || passInfo.state === 'none' ? (
+          <div className="mono mt-1.5 text-[11px] text-[var(--ink-faint)]">
+            未来 3 小时内无过境
+          </div>
+        ) : passInfo.state === 'overhead-now' ? (
+          <div className="mt-2 rounded-xl border border-[var(--accent)]/50 bg-[var(--accent-soft)] p-2.5">
+            <div className="text-[11px] font-bold tracking-[0.2em] text-[var(--accent)]">
+              ● 正在过顶 OVERHEAD
+            </div>
+            <div className="mono mt-1 text-[11px] text-[var(--ink)]">
+              当前仰角 {passInfo.nowElevDeg.toFixed(0)}° · 峰值 {passInfo.maxElevDeg.toFixed(0)}° @{' '}
+              {localTime(passInfo.maxElevAtMs)}
+            </div>
+          </div>
+        ) : (
+          <div className="mt-1.5 space-y-1.5">
+            <div className="flex items-baseline justify-between">
+              <span className="mono text-[18px] font-semibold leading-none text-[var(--accent)]">
+                T−{countdown(passInfo.maxElevAtMs)}
+              </span>
+              <span className="mono text-[11px] text-[var(--ink-dim)]">
+                {localTime(passInfo.maxElevAtMs)} 峰值
+              </span>
+            </div>
+            <div className="mono grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-[var(--ink-dim)]">
+              <span>峰值仰角 {passInfo.maxElevDeg.toFixed(0)}°</span>
+              <span>方位 {compassLabel(passInfo.azAtMaxDeg)} {Math.round(passInfo.azAtMaxDeg)}°</span>
+              {passInfo.aosMs && passInfo.losMs && (
+                <>
+                  <span>升起 {localTime(passInfo.aosMs)}</span>
+                  <span>落下 {localTime(passInfo.losMs)}</span>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ---------- Detail panel ----------
 
 interface DetailPanelProps {
@@ -397,88 +561,9 @@ interface DetailPanelProps {
   observer: Observer | null
   locating: boolean
   onLocateMe: () => void
+  city: CityDef | null
+  onSelectCity: (c: CityDef) => void
   passInfo: PassInfo | null
-}
-
-function PassSection({
-  observer,
-  locating,
-  onLocateMe,
-  passInfo,
-}: Pick<DetailPanelProps, 'observer' | 'locating' | 'onLocateMe' | 'passInfo'>) {
-  if (!observer) {
-    return (
-      <button
-        type="button"
-        onClick={onLocateMe}
-        disabled={locating}
-        className="flex w-full items-center justify-center gap-2 rounded-sm border border-dashed border-[var(--hairline)] py-2 text-[11px] text-[var(--ink-dim)] transition-colors hover:border-[var(--accent)]/50 hover:text-[var(--accent)] disabled:opacity-60"
-      >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="size-3.5">
-          <circle cx="12" cy="12" r="3" />
-          <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
-        </svg>
-        {locating ? '定位中…' : '设定我的位置 · 预测过顶时刻'}
-      </button>
-    )
-  }
-
-  const obs = `${Math.abs(observer.latDeg).toFixed(2)}°${observer.latDeg >= 0 ? 'N' : 'S'} ${Math.abs(observer.lonDeg).toFixed(2)}°${observer.lonDeg >= 0 ? 'E' : 'W'}`
-
-  return (
-    <div>
-      <div className="flex items-center justify-between">
-        <MicroLabel>Observer pass · 过顶预测</MicroLabel>
-        <span className="mono text-[9px] text-[var(--ink-faint)]">{obs}</span>
-      </div>
-
-      {!passInfo || passInfo.state === 'none' ? (
-        <div className="mono mt-2 text-[11px] text-[var(--ink-faint)]">
-          未来 3 小时内无过境
-        </div>
-      ) : passInfo.state === 'overhead-now' ? (
-        <div className="mt-2 rounded-sm border border-[var(--accent)]/50 bg-[var(--accent-soft)] p-2.5">
-          <div className="text-[11px] font-bold tracking-[0.2em] text-[var(--accent)]">
-            ● 正在过顶 OVERHEAD
-          </div>
-          <div className="mono mt-1 text-[11px] text-[var(--ink)]">
-            当前仰角 {passInfo.nowElevDeg.toFixed(0)}° · 峰值 {passInfo.maxElevDeg.toFixed(0)}° @{' '}
-            {localTime(passInfo.maxElevAtMs)}
-          </div>
-        </div>
-      ) : (
-        <div className="mt-2 space-y-1.5">
-          <div className="flex items-baseline justify-between">
-            <span className="mono text-[18px] font-semibold leading-none text-[var(--accent)]">
-              T−{countdown(passInfo.maxElevAtMs)}
-            </span>
-            <span className="mono text-[11px] text-[var(--ink-dim)]">
-              {localTime(passInfo.maxElevAtMs)} 峰值
-            </span>
-          </div>
-          <div className="mono grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-[var(--ink-dim)]">
-            <span>峰值仰角 {passInfo.maxElevDeg.toFixed(0)}°</span>
-            <span>方位 {compassLabel(passInfo.azAtMaxDeg)} {Math.round(passInfo.azAtMaxDeg)}°</span>
-            {passInfo.aosMs && passInfo.losMs && (
-              <>
-                <span>升起 {localTime(passInfo.aosMs)}</span>
-                <span>落下 {localTime(passInfo.losMs)}</span>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      <button
-        type="button"
-        onClick={onLocateMe}
-        disabled={locating}
-        className="mt-2 text-[9px] uppercase tracking-[0.2em] text-[var(--ink-faint)] transition-colors hover:text-[var(--ink-dim)] disabled:opacity-60"
-      >
-        {locating ? '定位中…' : '重新定位'}
-      </button>
-    </div>
-  )
 }
 
 function DetailPanel({
@@ -487,6 +572,8 @@ function DetailPanel({
   observer,
   locating,
   onLocateMe,
+  city,
+  onSelectCity,
   passInfo,
 }: DetailPanelProps) {
   const def = getGroupDef(selected.groupKey)
@@ -503,8 +590,8 @@ function DetailPanel({
   ]
 
   return (
-    <div className="absolute bottom-[76px] left-4 z-20 w-[272px] md:bottom-6 md:left-6 md:w-[304px]">
-      <div className="panel reticle rise rounded-sm p-4">
+    <div className="absolute bottom-[84px] left-4 z-20 w-[288px] md:bottom-6 md:left-6 md:w-[320px]">
+      <div className="panel reticle rise rounded-[26px] p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <MicroLabel>
@@ -520,7 +607,7 @@ function DetailPanel({
           <button
             type="button"
             onClick={onCloseDetail}
-            className="text-[var(--ink-faint)] transition-colors hover:text-[var(--ink-dim)]"
+            className="flex size-7 items-center justify-center rounded-full text-[var(--ink-faint)] transition-colors hover:bg-white/5 hover:text-[var(--ink-dim)]"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="size-3.5">
               <path d="M18 6 6 18M6 6l12 12" />
@@ -540,12 +627,14 @@ function DetailPanel({
           ))}
         </div>
 
-        {/* Pass prediction */}
+        {/* Location + pass prediction */}
         <div className="mt-3 border-t border-[var(--hairline)] pt-3">
-          <PassSection
+          <LocationSection
             observer={observer}
             locating={locating}
             onLocateMe={onLocateMe}
+            city={city}
+            onSelectCity={onSelectCity}
             passInfo={passInfo}
           />
         </div>
@@ -556,6 +645,8 @@ function DetailPanel({
 
 // ---------- Time controls ----------
 
+const SPEEDS = [1, 10, 60, 300, 1000]
+
 interface TimeControlsProps {
   playing: boolean
   speed: number
@@ -564,8 +655,6 @@ interface TimeControlsProps {
   onResetNow: () => void
   simTime: Date
 }
-
-const SPEEDS = [1, 10, 60, 300, 1000]
 
 function TimeControls({
   playing,
@@ -578,24 +667,24 @@ function TimeControls({
   const clockStr = `${simTime.toISOString().slice(0, 19).replace('T', ' ')} UTC`
   return (
     <div className="absolute bottom-4 left-1/2 z-20 -translate-x-1/2">
-      <div className="panel rise rise-4 flex items-center gap-1 rounded-sm px-2 py-1.5">
+      <div className="panel rise rise-4 flex items-center gap-0.5 rounded-full px-1.5 py-1">
         <button
           type="button"
           onClick={onResetNow}
           title="回到当前真实时间"
-          className="mono rounded-sm px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-[var(--ink-dim)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"
+          className="mono rounded-full px-3 py-1.5 text-[10px] uppercase tracking-[0.14em] text-[var(--ink-dim)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"
         >
           Now
         </button>
         <button
           type="button"
           onClick={onTogglePlay}
-          className="flex size-7 items-center justify-center rounded-sm border border-[var(--accent)]/40 text-[var(--accent)] transition-colors hover:bg-[var(--accent-soft)]"
+          className="flex size-8 items-center justify-center rounded-full border border-[var(--accent)]/40 text-[var(--accent)] transition-colors hover:bg-[var(--accent-soft)]"
         >
           {playing ? (
             <svg viewBox="0 0 24 24" fill="currentColor" className="size-3">
-              <rect x="6" y="4" width="4" height="16" rx="0.5" />
-              <rect x="14" y="4" width="4" height="16" rx="0.5" />
+              <rect x="6" y="4" width="4" height="16" rx="1" />
+              <rect x="14" y="4" width="4" height="16" rx="1" />
             </svg>
           ) : (
             <svg viewBox="0 0 24 24" fill="currentColor" className="size-3">
@@ -610,7 +699,7 @@ function TimeControls({
             type="button"
             onClick={() => onSetSpeed(n)}
             className={cn(
-              'mono rounded-sm px-1.5 py-1 text-[10px] transition-colors',
+              'mono rounded-full px-2 py-1.5 text-[10px] transition-colors',
               speed === n
                 ? 'bg-[var(--accent-soft)] text-[var(--accent)]'
                 : 'text-[var(--ink-faint)] hover:text-[var(--ink-dim)]',
@@ -620,7 +709,7 @@ function TimeControls({
           </button>
         ))}
         <div className="mx-1 hidden h-4 w-px bg-[var(--hairline)] sm:block" />
-        <div className="mono hidden min-w-[152px] text-center text-[10px] tracking-wider text-[var(--ink-dim)] sm:block">
+        <div className="mono hidden min-w-[150px] text-center text-[10px] tracking-wider text-[var(--ink-dim)] sm:block">
           {clockStr}
         </div>
       </div>
@@ -628,14 +717,12 @@ function TimeControls({
   )
 }
 
-function Attribution() {
-  return (
-    <div className="pointer-events-none absolute bottom-4 right-4 z-10 hidden text-right text-[9px] uppercase tracking-[0.18em] leading-4 text-[var(--ink-faint)] lg:block">
-      <div>Data · CelesTrak NORAD GP</div>
-      <div>Propagation · SGP4 local · no API key</div>
-    </div>
-  )
-}
+const Attribution = () => (
+  <div className="pointer-events-none absolute bottom-5 right-4 z-10 hidden text-right text-[9px] uppercase tracking-[0.18em] leading-4 text-[var(--ink-faint)] lg:block">
+    <div>Data · CelesTrak NORAD GP</div>
+    <div>Propagation · SGP4 local · no API key</div>
+  </div>
+)
 
 // ---------- Default Hud ----------
 
@@ -665,6 +752,8 @@ function HudInner(props: HudProps) {
     observer,
     locating,
     onLocateMe,
+    city,
+    onSelectCity,
     passInfo,
     satLabels,
     issLabelText,
@@ -728,6 +817,8 @@ function HudInner(props: HudProps) {
           observer={observer}
           locating={locating}
           onLocateMe={onLocateMe}
+          city={city}
+          onSelectCity={onSelectCity}
           passInfo={passInfo}
         />
       )}
