@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Engine, {
   type EngineCallbacks,
   type LabelPos,
@@ -8,6 +8,7 @@ import Engine, {
 } from '../engine/Engine'
 import Hud, { type DataStatus } from '../components/Hud'
 import LoadingOverlay from '../components/LoadingOverlay'
+import { predictBestPass, type Observer, type PassInfo } from '../engine/passes'
 
 const ISS_LABEL_TEXT = '国际空间站 ISS'
 
@@ -17,7 +18,7 @@ export default function Home() {
 
   const [loadingVisible, setLoadingVisible] = useState(true)
   const [progress, setProgress] = useState(0)
-  const [statusText, setStatusText] = useState('正在加载 TLE 快照…')
+  const [statusText, setStatusText] = useState('正在连接 CelesTrak…')
 
   const [dataStatus, setDataStatus] = useState<DataStatus>('loading')
   const [tleEpochMs, setTleEpochMs] = useState(Date.now())
@@ -38,6 +39,11 @@ export default function Home() {
   const [playing, setPlaying] = useState(true)
   const [speed, setSpeed] = useState(1)
   const [simTime, setSimTime] = useState(new Date())
+  const [refreshing, setRefreshing] = useState(false)
+
+  const [observer, setObserver] = useState<Observer | null>(null)
+  const [locating, setLocating] = useState(false)
+  const [passInfo, setPassInfo] = useState<PassInfo | null>(null)
 
   // Mount engine
   useEffect(() => {
@@ -81,10 +87,19 @@ export default function Home() {
       },
     }
 
-    const engine = new Engine(canvasRef.current, null as unknown as HTMLElement, callbacks)
+    let engine: Engine
+    try {
+      engine = new Engine(canvasRef.current, null as unknown as HTMLElement, callbacks)
+    } catch (err) {
+      console.error('[Engine.constructor]', err)
+      setLoadingVisible(false)
+      setStatusText('WebGL 不可用，请使用支持 WebGL 的浏览器')
+      return
+    }
     engineRef.current = engine
     engine.init().catch((err) => {
       console.error('[Engine.init]', err)
+      setLoadingVisible(false)
       setStatusText(typeof err === 'string' ? err : err?.message ?? '初始化失败')
     })
 
@@ -126,7 +141,53 @@ export default function Home() {
     return () => clearInterval(id)
   }, [])
 
+  // Pass prediction for the selected satellite, recomputed every 30 s while
+  // an observer is set — countdown itself ticks via panel re-renders.
+  useEffect(() => {
+    if (!selected || !observer) {
+      setPassInfo(null)
+      return
+    }
+    const compute = () => {
+      const e = engineRef.current
+      const satrec = e?.getSelectedSatrec()
+      if (satrec) setPassInfo(predictBestPass(satrec, observer))
+    }
+    compute()
+    const id = setInterval(compute, 30_000)
+    return () => clearInterval(id)
+  }, [selected?.norad, observer?.latDeg, observer?.lonDeg])
+
   // ---------- Handlers ----------
+
+  const onRefreshTLE = async () => {
+    const e = engineRef.current
+    if (!e || refreshing) return
+    setRefreshing(true)
+    try {
+      await e.refreshLive()
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
+  const onLocateMe = useCallback(() => {
+    if (locating || !('geolocation' in navigator)) return
+    setLocating(true)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setObserver({
+          latDeg: pos.coords.latitude,
+          lonDeg: pos.coords.longitude,
+          altKm: (pos.coords.altitude ?? 0) / 1000,
+        })
+        setLocating(false)
+      },
+      () => setLocating(false),
+      { enableHighAccuracy: false, timeout: 10_000, maximumAge: 300_000 },
+    )
+  }, [locating])
+
   const onToggleGroup = (key: string) => {
     engineRef.current?.setGroupVisible(key, !groupVisibility[key])
   }
@@ -171,12 +232,14 @@ export default function Home() {
   }
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-[#010208]">
+    <div className="relative h-screen w-screen overflow-hidden bg-[#04060b]">
       <canvas ref={canvasRef} className="block h-full w-full touch-none" />
 
       <Hud
         dataStatus={dataStatus}
         tleEpochMs={tleEpochMs}
+        refreshing={refreshing}
+        onRefreshTLE={onRefreshTLE}
         visibleCount={visibleCount}
         totalCount={totalCount}
         groupCounts={groupCounts}
@@ -194,6 +257,10 @@ export default function Home() {
         onSetSpeed={onSetSpeed}
         onResetNow={onResetNow}
         simTime={simTime}
+        observer={observer}
+        locating={locating}
+        onLocateMe={onLocateMe}
+        passInfo={passInfo}
         satLabels={satLabels}
         issLabelText={ISS_LABEL_TEXT}
         selectedLabelText={selected?.name ?? ''}

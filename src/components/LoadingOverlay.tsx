@@ -4,41 +4,79 @@ interface LoadingOverlayProps {
   visible: boolean // when false, apply opacity-0 + pointer-events-none (CSS transition 700ms)
 }
 
+/** Boot log lines revealed as loading progresses — cinematic mission-control flavor. */
+function bootLines(progress: number): { text: string; done: boolean }[] {
+  const p = progress
+  return [
+    { text: 'INIT RENDERER · WEBGL', done: p > 0.05 },
+    { text: 'LINK CELESTRAK NORAD GP', done: p > 0.3 },
+    { text: 'PARSE TWO-LINE ELEMENTS', done: p > 0.94 },
+    { text: 'ARM SGP4 PROPAGATOR', done: p >= 1 },
+  ]
+}
+
 export default function LoadingOverlay({ progress, status, visible }: LoadingOverlayProps) {
+  const lines = bootLines(progress)
+  const pct = Math.round(progress * 100)
+
   return (
     <div
-      className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#020409] transition-opacity duration-700${
+      className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#04060b]/92 transition-opacity duration-700${
         visible ? '' : ' opacity-0 pointer-events-none'
       }`}
     >
-      <div className="absolute size-[520px] rounded-full bg-cyan-500/10 blur-[120px]" />
-
-      <div className="relative z-10 flex flex-col items-center">
-        <div className="relative size-20">
-          <div
-            className="absolute inset-0 rounded-full border-2 border-cyan-300/20 border-t-cyan-300/80 animate-spin"
-            style={{ animationDuration: '1.6s' }}
-          />
-          <div className="absolute left-1/2 top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-300 shadow-[0_0_18px_4px_rgba(103,232,249,0.7)]" />
+      <div className="relative z-10 w-[300px] md:w-[340px]">
+        {/* Wordmark */}
+        <div className="rise">
+          <h1 className="font-display text-[26px] font-semibold tracking-[0.5em] text-[var(--ink)]">
+            ZENITH
+          </h1>
+          <div className="mt-1.5 text-[9px] uppercase tracking-[0.32em] text-[var(--ink-faint)]">
+            Real-time satellite tracker
+          </div>
         </div>
 
-        <div className="mt-8 text-center">
-          <div className="text-2xl font-semibold tracking-[0.35em] text-slate-100">ORBITLIVE</div>
-          <div className="mt-2 text-xs tracking-[0.3em] text-cyan-200/60">全球卫星实时追踪</div>
+        {/* Hairline progress */}
+        <div className="mt-8">
+          <div className="flex items-baseline justify-between">
+            <span className="mono text-[10px] tracking-[0.2em] text-[var(--accent)]">
+              {String(pct).padStart(3, '0')}%
+            </span>
+            <span className="mono text-[10px] text-[var(--ink-faint)]">ACQUIRING</span>
+          </div>
+          <div className="mt-1.5 h-px w-full bg-[var(--hairline)]">
+            <div
+              className="h-px bg-[var(--accent)] transition-all duration-300"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
         </div>
 
-        <div className="mt-8 h-[3px] w-64 overflow-hidden rounded-full bg-slate-800">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-sky-500 transition-all duration-300"
-            style={{ width: `${Math.round(progress * 100)}%` }}
-          />
+        {/* Boot log */}
+        <div className="mono mt-6 space-y-1.5">
+          {lines.map((l) => (
+            <div
+              key={l.text}
+              className={`flex items-center gap-2 text-[10px] tracking-[0.08em] transition-colors duration-500 ${
+                l.done ? 'text-[var(--ink-dim)]' : 'text-[var(--ink-faint)]'
+              }`}
+            >
+              <span className={l.done ? 'text-[var(--accent)]' : 'text-[var(--ink-faint)]'}>
+                {l.done ? '✓' : '·'}
+              </span>
+              <span>{l.text}</span>
+            </div>
+          ))}
         </div>
 
-        <div className="mt-3 text-[11px] tracking-wider text-slate-400">{status}</div>
+        {/* Live status */}
+        <div className="mt-6 border-t border-[var(--hairline)] pt-4 text-[11px] leading-5 text-[var(--ink-dim)]">
+          {status}
+        </div>
       </div>
 
-      <div className="absolute bottom-6 left-0 right-0 px-6 text-center text-[10px] leading-4 text-slate-600">
-        轨道数据：CelesTrak NORAD GP（TLE） · 推算：satellite.js SGP4（浏览器本地实时计算）
+      <div className="absolute bottom-6 left-0 right-0 px-6 text-center text-[9px] uppercase tracking-[0.18em] leading-4 text-[var(--ink-faint)]">
+        Data · CelesTrak NORAD GP · Propagation · SGP4 local
       </div>
     </div>
   )

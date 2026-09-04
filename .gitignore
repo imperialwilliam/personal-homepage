@@ -3,4 +3,4 @@ dist
 .wrangler
 *.log
 .env
-.env.local
+.env.local.uploads/

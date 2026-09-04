@@ -13,13 +13,18 @@ import {
 } from './shaders'
 import { TimeController } from './time'
 import {
-  loadSnapshot,
-  parseTLE,
-  syncLive,
+  loadTLEData,
+  fetchGroupsMap,
+  fetchLiveTLE,
+  parseTLEChunked,
+  parseTleEpochMs,
+  writeCachedTLE,
+  STALE_AFTER_MS,
   type SatRecord,
   type GroupBucket,
   type DataStatus,
 } from './data'
+import { matchFeatured, getFeatured, relatedNote } from './featured'
 
 const EARTH_RADIUS_KM = 6371
 const INV_EARTH_RADIUS = 1 / EARTH_RADIUS_KM
@@ -50,6 +55,10 @@ export interface SearchResult {
   norad: string
   name: string
   groupKey: string
+  /** Badge for canonical targets (ISS / CSS / HST) */
+  featuredBadge?: string
+  /** Dim note for modules & debris, e.g. "舱段 / 相关目标" */
+  note?: string
 }
 
 export interface GroupVisibility {
@@ -106,13 +115,6 @@ function eciToThree(
   return [tx, ty, tz]
 }
 
-function parseTleEpochMs(satrec: any): number {
-  const yy = satrec.epochyr as number
-  const year = yy < 57 ? 2000 + yy : 1900 + yy
-  const days = (satrec.epochdays as number) - 1
-  return Date.UTC(year, 0, 1) + days * 86400000
-}
-
 export class Engine {
   public time: TimeController
 
@@ -141,6 +143,7 @@ export class Engine {
 
   private sats: SatRecord[] = []
   private groups: GroupBucket[] = []
+  private groupsMap: Record<string, string> = {}
 
   private sunLight!: THREE.DirectionalLight
   private nightMat!: THREE.ShaderMaterial
@@ -166,7 +169,7 @@ export class Engine {
     this.time = new TimeController()
 
     this.scene = new THREE.Scene()
-    this.scene.background = new THREE.Color(0x010208)
+    this.scene.background = new THREE.Color(0x04060b)
 
     this.camera = new THREE.PerspectiveCamera(45, 1, 0.01, 3000)
 
@@ -200,69 +203,93 @@ export class Engine {
 
   async init(): Promise<void> {
     const cb = this.callbacks
-    cb.onProgress?.(0.02, '正在加载 TLE 快照…')
+    cb.onProgress?.(0.02, '正在初始化地球场景…')
 
-    const snap = await loadSnapshot((p, msg) => cb.onProgress?.(p * 0.8, msg))
+    // Build the scene first — the globe + stars render behind the loading
+    // overlay while satellite data streams in, so the app never feels frozen.
+    this.buildScene()
+    this.rafId = requestAnimationFrame(this.animate)
 
-    let epochMs = Date.now()
-    if (snap.meta.fetchedAt) {
-      const parsed = Date.parse(snap.meta.fetchedAt)
-      if (!isNaN(parsed)) epochMs = parsed
-    }
-    this.tleEpochMs = epochMs
+    cb.onProgress?.(0.06, '正在加载卫星轨道数据…')
+    const [source, groupsMap] = await Promise.all([
+      loadTLEData((p, msg) => cb.onProgress?.(0.06 + p * 0.52, msg)),
+      fetchGroupsMap(),
+    ])
+    if (this.disposed) return
+    this.groupsMap = groupsMap
 
-    cb.onProgress?.(
-      0.78,
-      '解析 ' + (snap.tleText.length / 1024 / 1024).toFixed(1) + ' MB 轨道根数…',
+    cb.onProgress?.(0.6, '解析轨道根数…')
+    const { sats, groups, avgEpochMs } = await parseTLEChunked(
+      source.tleText,
+      groupsMap,
+      (p, msg) => cb.onProgress?.(0.6 + p * 0.34, msg),
     )
-
-    const { sats, groups } = parseTLE(snap.tleText, snap.groupsMap)
+    if (this.disposed) return
     this.sats = sats
     this.groups = groups
+    this.tleEpochMs = avgEpochMs
     for (const g of groups) {
       this.groupCounts[g.def.key] = g.sats.length
       this.groupVisibility[g.def.key] = true
     }
 
-    cb.onProgress?.(0.85, '构建 ' + sats.length.toLocaleString() + ' 颗卫星轨道模型…')
+    cb.onProgress?.(0.96, `构建 ${sats.length.toLocaleString()} 颗卫星渲染模型…`)
+    // Initial positions are hidden; the animate loop fills them within ~6 frames.
+    this.buildSatPoints()
 
-    this.buildScene()
+    this.dataStatus = source.status
+    cb.onDataStatus?.(source.status)
+    cb.onProgress?.(1, '即将进入轨道…')
 
-    this.dataStatus = 'snapshot'
-    cb.onDataStatus?.('snapshot')
-    cb.onProgress?.(0.95, '即将进入轨道…')
+    this.ready = true
+    cb.onReady?.()
+    const params = new URLSearchParams(window.location.search)
+    const sel = params.get('sel')
+    if (sel) this.select(sel)
 
-    this.rafId = requestAnimationFrame(this.animate)
-
-    void this.backgroundSyncLive(snap.groupsMap)
+    // Background refresh when data is stale (snapshot, or cache older than 2h)
+    const needsRefresh =
+      source.status === 'snapshot' ||
+      (source.status === 'cached' && Date.now() - source.fetchedAt > STALE_AFTER_MS)
+    if (needsRefresh) void this.backgroundSyncLive()
   }
 
-  private async backgroundSyncLive(
-    groupsMap: Record<string, string>,
-  ): Promise<void> {
-    const liveText = await syncLive()
-    if (this.disposed || !this.ready) {
-      // Even if not ready yet, proceed with the swap — the animate loop will
-      // pick up the new sat points once it starts. Just guard against dispose.
-      if (this.disposed) return
-    }
-    if (liveText) {
-      try {
-        const { sats, groups } = parseTLE(liveText, groupsMap)
-        this.sats = sats
-        this.groups = groups
-        for (const g of groups) {
-          this.groupCounts[g.def.key] = g.sats.length
-        }
-        this.rebuildSatPoints()
-        this.tleEpochMs = Date.now()
-        this.dataStatus = 'live'
-        this.callbacks.onDataStatus?.('live')
-      } catch {
-        this.dataStatus = 'snapshot-stale'
-        this.callbacks.onDataStatus?.('snapshot-stale')
+  /** Fetch live TLE from CelesTrak and hot-swap the scene data. */
+  async refreshLive(): Promise<boolean> {
+    const text = await fetchLiveTLE()
+    if (!text || this.disposed) return false
+    try {
+      const { sats, groups, avgEpochMs } = await parseTLEChunked(text, this.groupsMap)
+      if (this.disposed) return false
+      this.sats = sats
+      this.groups = groups
+      for (const g of groups) {
+        this.groupCounts[g.def.key] = g.sats.length
       }
-    } else {
+      this.rebuildSatPoints()
+      this.tleEpochMs = avgEpochMs
+      this.dataStatus = 'live'
+      this.callbacks.onDataStatus?.('live')
+      void writeCachedTLE(text)
+      // Re-anchor the selected satellite onto its fresh satrec
+      if (this.selectedSatRecord) {
+        const sel = this.sats.find((s) => s.norad === this.selectedSatRecord!.norad)
+        if (sel) {
+          this.selectedSatRecord = sel
+          this.orbitDirty = true
+          this.lastOrbitBuild = 0
+        }
+      }
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  private async backgroundSyncLive(): Promise<void> {
+    const ok = await this.refreshLive()
+    if (this.disposed) return
+    if (!ok && this.dataStatus === 'snapshot') {
       this.dataStatus = 'snapshot-stale'
       this.callbacks.onDataStatus?.('snapshot-stale')
     }
@@ -277,13 +304,14 @@ export class Engine {
     const hemi = new THREE.HemisphereLight(0x2a3c5f, 0x05070d, 0.5)
     this.scene.add(hemi)
 
-    // Textures
+    // Textures (WebP — ~69% smaller than the original JPG/PNG set)
     const loader = new THREE.TextureLoader()
-    const earthAtmos = loader.load('/textures/earth_atmos_2048.jpg')
-    const earthNormal = loader.load('/textures/earth_normal_2048.jpg')
-    const earthSpecular = loader.load('/textures/earth_specular_2048.jpg')
-    const earthLights = loader.load('/textures/earth_lights_2048.png')
-    const earthClouds = loader.load('/textures/earth_clouds_1024.png')
+    const base = import.meta.env.BASE_URL
+    const earthAtmos = loader.load(`${base}textures/earth_atmos_2048.webp`)
+    const earthNormal = loader.load(`${base}textures/earth_normal_2048.webp`)
+    const earthSpecular = loader.load(`${base}textures/earth_specular_2048.webp`)
+    const earthLights = loader.load(`${base}textures/earth_lights_2048.webp`)
+    const earthClouds = loader.load(`${base}textures/earth_clouds_1024.webp`)
     earthAtmos.colorSpace = THREE.SRGBColorSpace
     earthClouds.colorSpace = THREE.SRGBColorSpace
     earthLights.colorSpace = THREE.SRGBColorSpace
@@ -414,26 +442,18 @@ export class Engine {
 
   private buildSatPoints(): void {
     const pixelRatio = this.renderer.getPixelRatio()
-    const date = this.time.now()
-    const gmst = gstime(date)
 
     for (const group of this.groups) {
       if (group.sats.length === 0) continue
       const def = group.def
+      // All points start hidden (far below the globe). The animate loop
+      // propagates 1/6 of the fleet per frame, so every position is real
+      // within ~6 frames (~100 ms) — no multi-second main-thread freeze.
       const positions = new Float32Array(group.sats.length * 3)
       for (let i = 0; i < group.sats.length; i++) {
-        const sat = group.sats[i]
-        const eci = propagateSat(sat.satrec, date)
-        if (!eci) {
-          positions[i * 3] = 0
-          positions[i * 3 + 1] = -1e5
-          positions[i * 3 + 2] = 0
-          continue
-        }
-        const [tx, ty, tz] = eciToThree(eci, gmst)
-        positions[i * 3] = tx
-        positions[i * 3 + 1] = ty
-        positions[i * 3 + 2] = tz
+        positions[i * 3] = 0
+        positions[i * 3 + 1] = -1e5
+        positions[i * 3 + 2] = 0
       }
       const geo = new THREE.BufferGeometry()
       const attr = new THREE.BufferAttribute(positions, 3)
@@ -481,9 +501,9 @@ export class Engine {
       new THREE.BufferAttribute(new Float32Array(ORBIT_SAMPLES * 3), 3),
     )
     const orbitMat = new THREE.LineBasicMaterial({
-      color: 0x8be9ff,
+      color: 0xf0a83c,
       transparent: true,
-      opacity: 0.9,
+      opacity: 0.95,
     })
     this.orbitLine = new THREE.Line(orbitGeo, orbitMat)
     this.orbitLine.visible = false
@@ -497,9 +517,9 @@ export class Engine {
       new THREE.BufferAttribute(new Float32Array((COV_SEGMENTS + 1) * 3), 3),
     )
     const covMat = new THREE.LineBasicMaterial({
-      color: 0x67e8f9,
+      color: 0xf0a83c,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.7,
     })
     this.covLoop = new THREE.Line(covGeo, covMat)
     this.covLoop.visible = false
@@ -513,9 +533,9 @@ export class Engine {
       new THREE.BufferAttribute(new Float32Array(COV_SEGMENTS * 3 * 3), 3),
     )
     const fanMat = new THREE.MeshBasicMaterial({
-      color: 0x22d3ee,
+      color: 0xf0a83c,
       transparent: true,
-      opacity: 0.07,
+      opacity: 0.06,
       side: THREE.DoubleSide,
       depthWrite: false,
     })
@@ -640,14 +660,6 @@ export class Engine {
     this.renderer.render(this.scene, this.camera)
 
     this.callbacks.onTick?.()
-
-    if (!this.ready) {
-      this.ready = true
-      this.callbacks.onReady?.()
-      const params = new URLSearchParams(window.location.search)
-      const sel = params.get('sel')
-      if (sel) this.select(sel)
-    }
   }
 
   private updateCoverage(satPos: THREE.Vector3, earthCentralAngle: number): void {
@@ -835,26 +847,37 @@ export class Engine {
   search(query: string): SearchResult[] {
     const q = query.trim().toLowerCase()
     if (!q) return []
-    const startsWith: SearchResult[] = []
-    const includes: SearchResult[] = []
+    const featuredNorads = new Set(matchFeatured(q).map((f) => f.norad))
+
+    interface Scored extends SearchResult {
+      score: number
+    }
+    const scored: Scored[] = []
     for (const sat of this.sats) {
       const name = sat.name.toLowerCase()
       const norad = sat.norad
-      if (name.startsWith(q) || norad.startsWith(q)) {
-        startsWith.push({
-          norad: sat.norad,
-          name: sat.name,
-          groupKey: sat.groupKey,
-        })
-      } else if (name.includes(q) || norad.includes(q)) {
-        includes.push({
-          norad: sat.norad,
-          name: sat.name,
-          groupKey: sat.groupKey,
-        })
-      }
+      let score = 0
+      if (featuredNorads.has(norad)) score = 100
+      else if (name.startsWith(q) || norad.startsWith(q)) score = 20
+      else if (name.includes(q) || norad.includes(q)) score = 10
+      if (score === 0) continue
+
+      const featured = getFeatured(norad)
+      const note = relatedNote(sat.name, norad)
+      if (note) score -= 8 // modules/debris rank below canonical objects
+      if (featured) score = 100
+
+      scored.push({
+        norad,
+        name: sat.name,
+        groupKey: sat.groupKey,
+        featuredBadge: featured?.badge,
+        note: note ?? undefined,
+        score,
+      })
     }
-    return [...startsWith, ...includes].slice(0, 9)
+    scored.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
+    return scored.slice(0, 9).map(({ score: _score, ...r }) => r)
   }
 
   getGroupCounts(): Record<string, number> {
@@ -889,6 +912,11 @@ export class Engine {
 
   getSelectedInfo(): SatInfo | null {
     return this.selectedInfo
+  }
+
+  /** Satrec of the currently selected satellite (for pass prediction). */
+  getSelectedSatrec(): any | null {
+    return this.selectedSatRecord?.satrec ?? null
   }
 
   private onResize = (): void => {
