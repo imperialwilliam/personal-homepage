@@ -109,11 +109,11 @@ export default function Home() {
     }
   }, [])
 
-  // 1Hz clock tick (UTC display)
+  // 1Hz clock tick (UTC display) — falls back to wall time if the engine died
   useEffect(() => {
     const id = setInterval(() => {
       const e = engineRef.current
-      if (e) setSimTime(e.time.now())
+      setSimTime(e ? e.time.now() : new Date())
     }, 1000)
     return () => clearInterval(id)
   }, [])
